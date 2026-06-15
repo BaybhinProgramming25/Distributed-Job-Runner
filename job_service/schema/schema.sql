@@ -2,6 +2,7 @@ CREATE DATABASE IF NOT EXISTS dist_jobs_scheduler;
 
 CREATE TABLE IF NOT EXISTS dist_jobs_scheduler.users(
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name STRING(255) NOT NULL,
     email STRING(255) NOT NULL,
     password_hash STRING NOT NULL,
 )
