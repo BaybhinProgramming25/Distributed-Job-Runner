@@ -1,2 +1,5 @@
 # Ignore Maven target folder
 target/
+
+# Ignore .env 
+.env
