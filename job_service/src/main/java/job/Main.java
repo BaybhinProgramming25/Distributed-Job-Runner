@@ -43,11 +43,17 @@ public class Main {
             
                 Job job = jobSubmission(request);
                 Timestamp nextTime = getNextRunTime(job.createdAt(), job.Schedule());
+
+                if (nextTime == null) {
+                    ctx.status(400).json("error", "could not calculate next time");
+                }
+
                 NextJob nextJob = insertNextScheduledJob(job, nextTime);
                 
                 if (next_job == null) {
                     ctx.status(201).json(Map.of("job", job)); 
                 } 
+
                 ctx.status(201).json(Map.of(
                     "job", job,
                     "next_job", next_job
@@ -91,7 +97,7 @@ public class Main {
     }
 
     // After calculating the next run time, add the new job 
-    public static void insertNextScheduledJob(Job job, Timestamp nextRunTime) {
+    public static NextJob insertNextScheduledJob(Job job, Timestamp nextRunTime) {
 
         NextJob nextJob = new NextJob(UUID.randomUUID(), nextRunTime, job.JobId()); 
 
@@ -113,6 +119,8 @@ public class Main {
         catch (SQLException e) {
             throw new RuntimeException("Failed to insert next job: ", e);
         }
+
+        return nextJob;
     }
 
 
