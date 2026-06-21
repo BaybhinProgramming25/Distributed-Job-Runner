@@ -70,8 +70,6 @@ public class JobController {
         return ResponseEntity.status(HttpStatus.CREATED).body("Successfully added job.");
     }
 
-
-
     public static Timestamp getNextRunTime(Timestamp currentTime, String cronString) {
 
         CronParser parser = new CronParser(CronDefinitionBuilder.instanceDefinitionFor(CronType.UNIX));
