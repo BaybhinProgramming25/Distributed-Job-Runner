@@ -3,6 +3,8 @@ package com.example.controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DataAccessException;
 
 import java.sql.Timestamp;
 import java.util.UUID;
@@ -22,8 +24,6 @@ import com.cronutils.model.time.ExecutionTime;
 import com.example.model.Job;
 import com.example.model.JobRequest;
 
-import com.example.database.Database;
-
 @RestController
 @RequestMapping("/job")
 public class JobController {
@@ -31,42 +31,34 @@ public class JobController {
     private static final int STARTING_MAX_RETRIES = 0;
     private static final int MAX_RETRIES_LIMIT = 10;
 
+    private final JdbcTemplate jdbcTemplate;
+
+    public JobController(JdbcTemplate jdbctemplate) {
+        this.jdbcTemplate = jdbctemplate; 
+    }
+
     @PostMapping
     public ResponseEntity<String> addJob(JobRequest request) {
 
-        // Calculate the nexttime immediately
         Timestamp nextUTC = getNextRunTime(Timestamp.from(Instant.now()), request.Schedule());
 
         if (nextUTC == null) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Failed to add job.");
         }
 
-        // Create job
-        Job job = new Job(UUID.randomUUID(), request.Schedule(), STARTING_MAX_RETRIES, MAX_RETRIES_LIMIT, nextUTC);
-
-        // String SQL
-        String sql = "INSERT INTO jobs (id, schedule, retriesCount, maxRetries, createdAt, nextRun) VALUES (?, ?, ?, ?, ?, ?)";
-
-        // Setup database connection
-        try(
-            Connection conn = Database.getDataSource().getConnection();
-            PreparedStatement stmt = conn.prepareStatement(sql);
-        ) {
-            stmt.setObject(1, job.JobId());
-            stmt.setObject(2, job.Schedule());
-            stmt.setObject(3, job.retryCount());
-            stmt.setObject(4, job.maxRetries());
-            stmt.setObject(5, job.createdAt());
-            
-            int rowsInserted = stmt.executeUpdate();
-            if (rowsInserted < 1) {
-                System.out.println("Couldn't add to database!");
-            }
+        try {
+            jdbcTemplate.update(
+            "INSERT INTO jobs (id, schedule, retriesCount, maxRetries, nextRun) VALUES (?, ?, ?, ?, ?)",
+            UUID.randomUUID(),
+            request.Schedule(),
+            STARTING_MAX_RETRIES,
+            MAX_RETRIES_LIMIT,
+            nextUTC
+        ); 
+        } catch (DataAccessException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to add job");
         }
-        catch (SQLException e) {
-            throw new RuntimeException("Failed to insert job: ", e);
-        }
-
+        
         return ResponseEntity.status(HttpStatus.CREATED).body("Successfully added job.");
     }
 
