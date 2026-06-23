@@ -1,36 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { generateRandomMinuteCron } from './jobTemplates'
-import { fetchJobs, createJob } from './api'
-import JobList from './JobList'
+import { createJob } from './api'
 import './App.css'
 
 const App = () => {
-  const [userId, setUserId] = useState(() => localStorage.getItem('jobScheduler.userId') || 'user-1024')
-  const [jobs, setJobs] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
-
-  useEffect(() => {
-    localStorage.setItem('jobScheduler.userId', userId)
-  }, [userId])
-
-  const loadJobs = useCallback(async () => {
-    try {
-      const data = await fetchJobs()
-      setJobs(data)
-      setError('')
-    } catch {
-      setError('Could not reach the job service at localhost:7000. Is it running?')
-    }
-  }, [])
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch + polling
-    loadJobs()
-    const interval = setInterval(loadJobs, 8000)
-    return () => clearInterval(interval)
-  }, [loadJobs])
 
   useEffect(() => {
     if (!toast) return
@@ -42,14 +18,12 @@ const App = () => {
     setSubmitting(true)
     try {
       const schedule = generateRandomMinuteCron()
-      const created = await createJob({
-        UserId: userId.trim() || 'anonymous',
+      await createJob({
         Name: 'Quick Job',
         Type: 'QUICK_JOB',
         isRecurring: true,
         Schedule: schedule,
       })
-      setJobs((prev) => [created, ...prev])
       setToast(`Quick job scheduled (${schedule})`)
       setError('')
     } catch {
@@ -69,10 +43,6 @@ const App = () => {
             <p className="subtitle">Send a quick job and watch it run across the cluster.</p>
           </div>
         </div>
-        <label className="user-field">
-          User ID
-          <input value={userId} onChange={(event) => setUserId(event.target.value)} placeholder="e.g. user-1024" />
-        </label>
       </header>
 
       {error && <div className="banner banner-error">{error}</div>}
@@ -84,16 +54,6 @@ const App = () => {
           <button type="button" className="btn btn-primary" onClick={handleSendQuickJob} disabled={submitting}>
             {submitting ? 'Sending…' : 'Send Quick Job'}
           </button>
-        </section>
-
-        <section className="panel">
-          <div className="panel-header">
-            <h2>Scheduled Jobs</h2>
-            <button type="button" className="btn btn-ghost" onClick={loadJobs}>
-              ↻ Refresh
-            </button>
-          </div>
-          <JobList jobs={jobs} />
         </section>
       </main>
 
