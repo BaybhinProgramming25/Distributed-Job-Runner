@@ -15,31 +15,24 @@ public class JobPolling {
     }
 
     public void pollJobs() {
-        /*
-        Left to do:
-        - Add jobs to the database from job_service
-        - Poll for jobs that are on the database
-        - Push ready jobs onto the RabbitMQ
-        */
-        
+    
         while (true) {
 
-            // Poll the database 
             try {
                 
                 List<Map<String, Object>> jobs = jdbcTemplate.queryForObject(
                     "SELECT * FROM dist_jobs_scheduler.jobs WHERE nextRun <= now()"
                 );
-
+                
+                // Verify jobs are being pulled 
                 for (Map<String, Object> job : jobs) {
                     System.out.println(job);
                 }
 
-                // Do some processing here afterwards...
-                
+                // Do some processing here afterwards with RabbitMQ
 
-                // Sleep for 5 minutes
-                Thread.sleep(5 * 60 * 1000);
+                // 30-second sleep 
+                Thread.sleep(30000);
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
