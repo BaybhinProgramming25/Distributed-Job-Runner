@@ -78,6 +78,6 @@ public class JobController {
         }
 
         return Timestamp.from(nextUTC.toInstant());
-
+        
     }
 }
