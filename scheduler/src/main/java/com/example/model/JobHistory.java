@@ -3,11 +3,11 @@ package com.example.model;
 import java.sql.Timestamp;
 import java.util.UUID;
 
-public record Job(
-    UUID JobId, 
+public record JobHistory(
+    UUID JobId,
+    UUID HistoryId,
     String Schedule,
-    int retryCount,
+    int retriesCount,
     int maxRetries,
-    Timestamp createdAt,
     Timestamp nextRun
 ) {}

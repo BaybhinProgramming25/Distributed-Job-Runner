@@ -5,15 +5,28 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.DataAccessException;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.jdbc.core.RowMapper; 
+
+import com.cronutils.parser.CronParser;
+import com.cronutils.model.definition.CronDefinitionBuilder;
+import com.cronutils.model.CronType;
+import com.cronutils.model.Cron;
+import com.cronutils.model.time.ExecutionTime;
+
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.time.ZoneOffset;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import com.example.model.Job;
+import com.example.model.JobHistory;
 
 @Component
 public class JobPolling implements CommandLineRunner {
@@ -21,12 +34,12 @@ public class JobPolling implements CommandLineRunner {
     private final JdbcTemplate jdbcTemplate; 
     private final RabbitTemplate rabbitTemplate;
 
-    private final RowMapper<Job> jobRowMapper = (rs, rowNum) -> new Job(
-        UUID.fromString(rs.getString("id")),
+    private final RowMapper<JobHistory> jobRowMapper = (rs, rowNum) -> new JobHistory(
+        UUID.fromString(rs.getString("jobId")),
+        UUID.fromString(rs.getString("historyId")),
         rs.getString("schedule"),
         rs.getInt("retriesCount"),
         rs.getInt("maxRetries"),
-        rs.getTimestamp("createdAt"),
         rs.getTimestamp("nextRun")
     );
 
@@ -57,31 +70,48 @@ public class JobPolling implements CommandLineRunner {
 
             try {
                 
-                List<Job> jobs = jdbcTemplate.query(
-                    "SELECT * FROM dist_jobs_scheduler.jobs WHERE nextRun <= now()", jobRowMapper
+                List<JobHistory> jobs = jdbcTemplate.query(
+                    "SELECT jobs.id AS jobId, jobs.schedule AS schedule, jobs.maxRetries AS maxRetries, jobs.nextRun AS nextRun, history.id AS historyId, history.retriesCount AS retriesCount FROM jobs JOIN history ON jobs.id = history.jobId WHERE nextRun <= now()", jobRowMapper
                 );
                 
-                for(Job job : jobs) {
-        
-                    // Add job to the queue 
-                    rabbitTemplate.convertAndSend("job.queue", job);
+                for(JobHistory job : jobs) {
 
-                    // Calculate the next run time 
-                    Timestamp nextUTC = getNextRunTime(job.nextRun(), job.Schedule()); 
+                    if (job.retriesCount() >= job.maxRetries()) {
 
-                    // Insert it into the database
-                    try {
-                        jdbcTemplate.update(
-                        "INSERT INTO jobs (id, schedule, retriesCount, maxRetries, createdAt, nextRun) VALUES (?, ?, ?, ?, ?, ?)",
-                        UUID.randomUUID(),
-                        request.Schedule(),
-                        STARTING_MAX_RETRIES,
-                        MAX_RETRIES_LIMIT,
-                        job.createdAt(),
-                        nextUTC
-                    ); 
-                    } catch (DataAccessException e) {
-                        System.err.println("Failed to update nextRun for job " + job.JobId() + ": " + e.getMessage());
+                        try {
+
+                            int rowsChanged = jdbcTemplate.update(
+                                "UPDATE history SET jobStatus = ? WHERE id = ?", "failed", job.HistoryId()
+                            );
+
+                            if (rowsChanged == 0) {
+                                // Log that something didnt change in the database (not necessarily an error)
+                                // Add the logging and error stuff afterwards
+
+                            }
+
+                        } catch (DataAccessException e) {
+
+                            // Do something here 
+                        }
+                    }
+                    else {
+                        
+                        // Add the job into the queue
+                        rabbitTemplate.convertAndSend("job.queue", job);
+
+                        // Calculate the next run 
+                        Timestamp nextUTC = getNextRunTime(Timestamp.from(Instant.now()), job.Schedule());
+
+                        try {
+                            jdbcTemplate.update(
+                                "UPDATE jobs SET nextRun = ? WHERE id = ?", nextUTC, job.JobId()
+                            );
+
+                        } catch (DataAccessException e) {
+                            
+                            // Do something else here instead of returning
+                        }
                     }
                 }
 
