@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import com.example.model.JobHistory;
+import com.example.model.JobDTO;
 
 @Component
 public class JobPolling implements CommandLineRunner {
@@ -39,9 +39,8 @@ public class JobPolling implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(JobPolling.class);
 
-    private final RowMapper<JobHistory> jobRowMapper = (rs, rowNum) -> new JobHistory(
-        UUID.fromString(rs.getString("jobId")),
-        UUID.fromString(rs.getString("historyId")),
+    private final RowMapper<JobDTO> jobRowMapper = (rs, rowNum) -> new JobDTO(
+        UUID.fromString(rs.getString("id")),
         rs.getString("schedule"),
         rs.getInt("retriesCount"),
         rs.getInt("maxRetries"),
@@ -77,44 +76,33 @@ public class JobPolling implements CommandLineRunner {
 
                 try {
                 
-                    List<JobHistory> jobs = jdbcTemplate.query(
-                        "SELECT jobs.id AS jobId, jobs.schedule AS schedule, jobs.maxRetries AS maxRetries, jobs.nextRun AS nextRun, history.id AS historyId, history.retriesCount AS retriesCount FROM jobs JOIN history ON jobs.id = history.jobId WHERE nextRun <= now()", jobRowMapper
-                    );
+                    List<JobDTO> jobs = jdbcTemplate.query("SELECT * FROM jobs WHERE nextRun <= now() AND jobActive = 'active'", jobRowMapper);
                     
-                    for(JobHistory job : jobs) {
+                    for(JobDTO job : jobs) {
 
                         if (job.retriesCount() >= job.maxRetries()) {
-
-                            try {
-
-                                int rowsChanged = jdbcTemplate.update(
-                                    "UPDATE history SET jobStatus = ? WHERE id = ?", "failed", job.histoyId()
-                                );
-
-                                if (rowsChanged == 0) {
-                                    log.warn("Tried to mark history {} as failed, but no row was updated", job.histoyId());
-                                }
-
-                            } catch (DataAccessException e) {
-                                log.error("Database error while handling job {}", job.jobId(), e);
-                            }
+                            
+                            jdbcTemplate.update(
+                                "UPDATE jobs SET jobActive = ? WHERE id = ?", "dead", job.id()
+                            );
+                            
                         }
                         else {
     
                             Timestamp nextUTC = getNextRunTime(Timestamp.from(Instant.now()), job.schedule());
 
                             if (nextUTC == null) {
-                                log.warn("No next run time for job {} - skipping", job.jobId());
+                                log.warn("No next run time for job {} - skipping", job.id());
                                 continue; 
                             }
                             
                             try {
                                 jdbcTemplate.update(
-                                    "UPDATE jobs SET nextRun = ? WHERE id = ?", nextUTC, job.jobId()
+                                    "UPDATE jobs SET nextRun = ? WHERE id = ?", nextUTC, job.id()
                                 );
 
                             } catch (DataAccessException e) {
-                                log.error("Database error while handling job {}", job.jobId(), e);
+                                log.error("Database error while handling job {}", job.id(), e);
                                 continue;
                             }
 
