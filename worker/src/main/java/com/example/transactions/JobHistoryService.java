@@ -23,32 +23,41 @@ public class JobHistoryService {
     }
 
     @Transactional
-    public void recordFailure(UUID historyId, UUID jobId, String failedJob, Timestamp startedTime) {
+    public void recordStart(UUID historyId, UUID jobId, String processingStatus, Timestamp startedTime) {
 
         jdbcTemplate.update(
             "INSERT INTO dist_jobs_scheduler.history (id, jobId, jobStatus, jobStarted) VALUES (?, ?, ?, ?)",
             historyId,
             jobId,
-            failedJob,
+            processingStatus,
             startedTime
         );
+    }
 
-        // Also need to increment the counter 
+    @Transactional
+    public void recordFailure(UUID historyId, UUID jobId, String failedJob, Timestamp finishedTime) {
+
+        jdbcTemplate.update(
+            "UPDATE dist_jobs_scheduler.history SET jobStatus = ?, jobFinished = ? WHERE id = ?",
+            failedJob,
+            finishedTime,
+            historyId
+        );
+
+        // Also need to increment the counter
         jdbcTemplate.update(
             "UPDATE dist_jobs_scheduler.jobs SET retriesCount = retriesCount + 1 WHERE id = ?", jobId
         );
     }
 
     @Transactional
-    public void recordSuccess(UUID historyId, UUID jobId, String successJob, int retriesReset, Timestamp startedTime, Timestamp finishedTime) {
+    public void recordSuccess(UUID historyId, UUID jobId, String successJob, int retriesReset, Timestamp finishedTime) {
 
         jdbcTemplate.update(
-            "INSERT INTO dist_jobs_scheduler.history (id, jobId, jobStatus, jobStarted, jobFinished) VALUES (?, ?, ?, ?, ?)",
-            historyId,
-            jobId,
+            "UPDATE dist_jobs_scheduler.history SET jobStatus = ?, jobFinished = ? WHERE id = ?",
             successJob,
-            startedTime,
-            finishedTime
+            finishedTime,
+            historyId
         );
 
         jdbcTemplate.update(

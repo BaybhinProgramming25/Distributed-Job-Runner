@@ -1,4 +1,4 @@
-package com.exmaple.processing;
+package com.example.processing;
 
 import org.springframework.stereotype.Component;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -43,6 +43,7 @@ public class JobProcessing {
     private static final Logger log = LoggerFactory.getLogger(JobProcessing.class);
     private final Random random = new Random();
 
+    private static final String PROCESSING_JOB = "processing";
     private static final String SUCCESS_JOB = "success";
     private static final String FAILED_JOB = "failed";
     private static final int RETRIES_RESET = 0;
@@ -65,11 +66,17 @@ public class JobProcessing {
 
         UUID historyId = UUID.randomUUID();
         Timestamp startedTime = Timestamp.from(Instant.now());
-        
+
+        try {
+            jobHistoryService.recordStart(historyId, job.id(), PROCESSING_JOB, startedTime);
+        } catch (DataAccessException dbError) {
+            log.error("Job {} failed to record processing start - continuing anyway", job.id(), dbError);
+        }
+
         try {
 
-            // A job takes about 10 to 40 seconds with a chance for network hiccups to occur 
-            int seconds = random.nextInt(31) + 10; 
+            // A job takes about 10 to 40 seconds with a chance for network hiccups to occur
+            int seconds = random.nextInt(31) + 10;
             for(int i = 0; i < seconds; i++) {
                 Thread.sleep(1000L);
                 if (random.nextDouble() < 0.01) {
@@ -80,11 +87,11 @@ public class JobProcessing {
             Timestamp finishedTime = Timestamp.from(Instant.now());
 
             try {
-                jobHistoryService.recordSuccess(historyId, job.id(), SUCCESS_JOB, RETRIES_RESET, startedTime, finishedTime);
+                jobHistoryService.recordSuccess(historyId, job.id(), SUCCESS_JOB, RETRIES_RESET, finishedTime);
             } catch (DataAccessException dbError) {
                 log.error("Job {} failed AND couldn't record the success", job.id(), dbError);
             }
-                        
+
             log.info("Job {} finished successfully after {}s", job.id(), seconds);
         }
         catch (InterruptedException e) {
@@ -92,11 +99,13 @@ public class JobProcessing {
             log.warn("Job {} was interrupted", job.id(), e);
         }
         catch (RuntimeException e) {
-         
+
             log.error("Job {} failed - incrementing retry counter", job.id(), e);
 
+            Timestamp finishedTime = Timestamp.from(Instant.now());
+
             try {
-                jobHistoryService.recordFailure(historyId, job.id(), FAILED_JOB, startedTime);
+                jobHistoryService.recordFailure(historyId, job.id(), FAILED_JOB, finishedTime);
             } catch (DataAccessException dbError) {
                 log.error("Job {} failed AND couldn't record the failure", job.id(), dbError);
             }

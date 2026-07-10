@@ -14,8 +14,10 @@ CREATE TABLE IF NOT EXISTS dist_jobs_scheduler.history (
     jobId UUID NOT NULL REFERENCES dist_jobs_scheduler.jobs(id) ON DELETE CASCADE,
     jobStatus TEXT NOT NULL DEFAULT 'pending',
     jobStarted TIMESTAMPTZ NOT NULL,
-    jobFinished TIMESTAMPTZ NOT NULL
+    jobFinished TIMESTAMPTZ
 );
+
+CREATE INDEX IF NOT EXISTS history_jobid_started_idx ON dist_jobs_scheduler.history (jobId, jobStarted DESC);
 
 CREATE TABLE IF NOT EXISTS dist_jobs_scheduler.processedJobs (
     idempotency_key STRING PRIMARY KEY

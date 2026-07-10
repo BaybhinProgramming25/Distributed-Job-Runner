@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { generateRandomMinuteCron } from './jobTemplates'
 import { createJob } from './api'
+import { Dashboard } from './components/Dashboard'
 import './App.css'
 
 const App = () => {
+  const [tab, setTab] = useState('dashboard')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
@@ -47,14 +49,27 @@ const App = () => {
 
       {error && <div className="banner banner-error">{error}</div>}
 
+      <nav className="tabs">
+        <button type="button" className={`tab ${tab === 'dashboard' ? 'tab-active' : ''}`} onClick={() => setTab('dashboard')}>
+          Dashboard
+        </button>
+        <button type="button" className={`tab ${tab === 'quicksend' ? 'tab-active' : ''}`} onClick={() => setTab('quicksend')}>
+          Quick Send
+        </button>
+      </nav>
+
       <main>
-        <section className="panel quick-send-panel">
-          <h2>Send a Quick Job</h2>
-          <p>Click the button to schedule a quick job with a randomly generated interval (every 1-30 minutes).</p>
-          <button type="button" className="btn btn-primary" onClick={handleSendQuickJob} disabled={submitting}>
-            {submitting ? 'Sending…' : 'Send Quick Job'}
-          </button>
-        </section>
+        {tab === 'dashboard' && <Dashboard />}
+
+        {tab === 'quicksend' && (
+          <section className="panel quick-send-panel">
+            <h2>Send a Quick Job</h2>
+            <p>Click the button to schedule a quick job with a randomly generated interval (every 1-30 minutes).</p>
+            <button type="button" className="btn btn-primary" onClick={handleSendQuickJob} disabled={submitting}>
+              {submitting ? 'Sending…' : 'Send Quick Job'}
+            </button>
+          </section>
+        )}
       </main>
 
       {toast && <div className="toast">{toast}</div>}
