@@ -41,7 +41,7 @@ const App = () => {
         <div className="brand">
           <span className="brand-icon">⚡</span>
           <div>
-            <h1>Distributed Job Scheduler</h1>
+            <h1>Distributed Job Runner</h1>
             <p className="subtitle">Send a quick job and watch it run across the cluster.</p>
           </div>
         </div>
@@ -64,7 +64,7 @@ const App = () => {
         {tab === 'quicksend' && (
           <section className="panel quick-send-panel">
             <h2>Send a Quick Job</h2>
-            <p>Click the button to schedule a quick job with a randomly generated interval (every 1-30 minutes).</p>
+            <p>Click the button to schedule a quick job with a randomly generated interval (every 1-3 minutes).</p>
             <button type="button" className="btn btn-primary" onClick={handleSendQuickJob} disabled={submitting}>
               {submitting ? 'Sending…' : 'Send Quick Job'}
             </button>
