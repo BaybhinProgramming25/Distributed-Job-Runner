@@ -1,7 +1,7 @@
 services:
-  cockroach:
-    image: cockroachdb/cockroach:v22.2.3
-    command: start-single-node --insecure # keep it an insecure and run multiple nodes later 
+  cockroachdb:
+    image: cockroachdb/cockroach:latest
+    command: start-single-node --insecure
     container_name: my-cockroach
     ports:
       - "26257:26257"
