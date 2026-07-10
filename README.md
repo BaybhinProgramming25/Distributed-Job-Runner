@@ -15,14 +15,14 @@ Scheduling and execution are fully decoupled — the scheduler only decides *whe
           └──────┬──────┘                          └──────┬──────┘
                  │ writes                                 │
                  ▼                                         │
-          ┌─────────────┐        polls every 30s     ┌─────────────┐
+          ┌─────────────┐        polls every 30s      ┌─────────────┐
           │ CockroachDB │◄────────────────────────────│  scheduler  │
           └──────┬──────┘                             └──────┬──────┘
                  ▲                                            │ publish
                  │ writes status/history                      ▼
-          ┌─────────────┐        competing consumers   ┌─────────────┐
+          ┌─────────────┐        competing consumers    ┌─────────────┐
           │   worker    │◄──────────────────────────────│  RabbitMQ   │
-          │ (replicable)│                                └─────────────┘
+          │ (replicable)│                               └─────────────┘
           └─────────────┘
 ```
 
