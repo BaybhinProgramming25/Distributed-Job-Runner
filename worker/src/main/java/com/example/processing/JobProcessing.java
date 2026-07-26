@@ -1,114 +1,114 @@
 package com.example.processing;
 
 import org.springframework.stereotype.Component;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.dao.DataAccessException;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpStatus;
-
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-
-import org.springframework.jdbc.core.RowMapper; 
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cronutils.parser.CronParser;
-import com.cronutils.model.definition.CronDefinitionBuilder;
-import com.cronutils.model.CronType;
-import com.cronutils.model.Cron;
-import com.cronutils.model.time.ExecutionTime;
-
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.time.ZonedDateTime;
-import java.time.ZoneOffset;
-
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.Random;
 
-import com.example.model.JobDTO;
-import com.example.transactions.JobHistoryService;
+import com.example.model.JobBatch;
+import com.example.model.JobFound;
 
 @Component
 public class JobProcessing {
 
-    private final JobHistoryService jobHistoryService;
-
     private static final Logger log = LoggerFactory.getLogger(JobProcessing.class);
-    private final Random random = new Random();
+    private static final int SMS_MAX_JOBS_PER_ALERT = 25;
 
-    private static final String PROCESSING_JOB = "processing";
-    private static final String SUCCESS_JOB = "success";
-    private static final String FAILED_JOB = "failed";
-    private static final int RETRIES_RESET = 0;
+    private final JdbcTemplate jdbcTemplate;
 
-    public JobProcessing(JobHistoryService jobhistoryservice) {
-        this.jobHistoryService = jobhistoryservice;
+    public JobProcessing(JdbcTemplate jdbctemplate) {
+        this.jdbcTemplate = jdbctemplate;
     }
 
     @RabbitListener(queues = "job.queue")
-    public void processJob(JobDTO job) {
-        
-        log.info("Starting job {}", job.id());
+    public void processJob(JobBatch batch) {
 
-        Timestamp executionTime = job.nextRun();
+        log.info("Batch received: {} job(s), {} board failure(s), polled at {}", batch.foundJobs().size(), batch.failures().size(), batch.polledAt());
 
-        if (!jobHistoryService.claimExecution(job.id(), executionTime)) {
-            log.info("Job {} for execution time {} has already been processed, skipping job...", job.id(), executionTime);
+        for (String f : batch.failures()) {
+            log.warn("Board failed during poll: {}", f);
+        }
+
+        List<JobFound> freshJobs = insertAll(batch.foundJobs());
+
+        if (freshJobs.isEmpty()) {
+            log.info("No new jobs found this cycle...");
+        } else {
+            log.info("{} new job(s)", freshJobs.size());
+            notifyBatch(freshJobs);
+        }
+
+    }
+
+    private List<JobFound> insertAll(List<JobFound> newJobs) {
+
+        List<JobFound> freshJobs = new ArrayList<>();
+        for (JobFound j : newJobs) {
+            
+            int processedJob = jdbcTemplate.update(
+                "UPDATE dist_jobs_scheduler.found_jobs SET lastSeen = now() WHERE jobId = ?", j.jobId()
+            );
+            
+            if (processedJob == 0) {
+                jdbcTemplate.update("""
+                    INSERT INTO dist_jobs_scheduler.found_jobs
+                    (company, ats, jobId, title, location, department, url, posted, firstSeen, lastSeen)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())
+                    ON CONFLICT (job_id) DO UPDATE SET lastSeen = now()""", j.company(), j.ats(), j.jobId(), j.title(), j.location(), j.department(), j.url(), j.posted());
+                freshJobs.add(j);
+            }
+        }
+        return freshJobs;
+    }
+
+    private void notifyBatch(List<JobFound> newJobs) {
+
+        if (newJobs.isEmpty()) {
+            log.info("Nobody to notify since there are no new jobs...");
             return;
         }
 
-        UUID historyId = UUID.randomUUID();
-        Timestamp startedTime = Timestamp.from(Instant.now());
+        HashMap<String, List<JobFound>> companyJobMap = new HashMap<>();
+        for (JobFound job : newJobs) {
 
-        try {
-            jobHistoryService.recordStart(historyId, job.id(), PROCESSING_JOB, startedTime);
-        } catch (DataAccessException dbError) {
-            log.error("Job {} failed to record processing start - continuing anyway", job.id(), dbError);
+            String company = job.company();
+            if (companyJobMap.containsKey(company)) {
+                companyJobMap.get(company).add(job);
+            } else {
+                List<JobFound> companyJobList = new ArrayList<>();
+                companyJobList.add(job);
+                companyJobMap.put(company, companyJobList);
+            }
+
         }
 
-        try {
+        HashMap<Long, List<JobFound>> userJobsMap = new HashMap<>();
+        for (String company : companyJobMap.keySet()) {
+            
+            List<Long> userIds = jdbcTemplate.queryForList("SELECT user_id FROM dist_jobs_scheduler.watched_jobs WHERE company_id = ?", Long.class, company);
 
-            // A job takes about 10 to 40 seconds with a chance for network hiccups to occur
-            int seconds = random.nextInt(31) + 10;
-            for(int i = 0; i < seconds; i++) {
-                Thread.sleep(1000L);
-                if (random.nextDouble() < 0.01) {
-                    throw new RuntimeException("Network Hiccup");
+            for (Long userId : userIds) {
+
+                List<JobFound> jobs = companyJobMap.get(company);
+                if (userJobsMap.containsKey(userId)) {
+                    userJobsMap.get(userId).addAll(jobs);
+                } else {
+                    userJobsMap.put(userId, jobs);
                 }
             }
-
-            Timestamp finishedTime = Timestamp.from(Instant.now());
-
-            try {
-                jobHistoryService.recordSuccess(historyId, job.id(), SUCCESS_JOB, RETRIES_RESET, finishedTime);
-            } catch (DataAccessException dbError) {
-                log.error("Job {} failed AND couldn't record the success", job.id(), dbError);
-            }
-
-            log.info("Job {} finished successfully after {}s", job.id(), seconds);
         }
-        catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.warn("Job {} was interrupted", job.id(), e);
-        }
-        catch (RuntimeException e) {
 
-            log.error("Job {} failed - incrementing retry counter", job.id(), e);
-
-            Timestamp finishedTime = Timestamp.from(Instant.now());
-
-            try {
-                jobHistoryService.recordFailure(historyId, job.id(), FAILED_JOB, finishedTime);
-            } catch (DataAccessException dbError) {
-                log.error("Job {} failed AND couldn't record the failure", job.id(), dbError);
-            }
+        // We iterate and get the phone number of each of the persons 
+        // For now we just print the ID
+        for (Long userId : userJobsMap.keySet()) {
+            System.out.println(userId);
+            // Do more stuff later...
         }
     }
 }
