@@ -34,11 +34,10 @@ A distributed job-feed aggregator that polls **11 applicant-tracking systems** (
 
 | Layer | Technology |
 |---|---|
-| Services | Java 21, Spring Boot (`backend`, `scheduler`, `worker`) |
-| Messaging | RabbitMQ 3 (competing consumers via Spring AMQP) |
+| Services | Spring Boot (`backend`, `scheduler`, `worker`) |
+| Messaging | RabbitMQ (competing consumers via Spring AMQP) |
 | Database | CockroachDB (Postgres wire-compatible), Spring JDBC |
-| Auth | JWT (stateless), bcrypt password hashing |
-| Live updates | STOMP over WebSocket (per-user queues via `SimpMessagingTemplate`) |
+| Live updates | STOMP over WebSockets (per-user queues via `SimpMessagingTemplate`) |
 | Frontend | React 19, Vite |
 
 
@@ -50,7 +49,6 @@ A distributed job-feed aggregator that polls **11 applicant-tracking systems** (
 | `POST /api/users/login` | Authenticate, returns a JWT |
 | `GET /api/dashboard` | Recent jobs for the authenticated user's subscriptions |
 | `POST /api/subscribe` | Update which ATS platforms the user watches |
-| `WS /ws` (STOMP) | Live feed — new jobs pushed to `/user/queue/jobs` 
 
 
 ## Visit
