@@ -7,7 +7,13 @@ services:
       - "8081:8080"
     volumes:
       - cockroach-data:/cockroach/cockroach-data
-    
+      - ./schema/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD", "cockroach", "sql", "--insecure", "-e", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   rabbitmq:
     image: rabbitmq:3-management-alpine
     ports:
@@ -20,19 +26,27 @@ services:
       retries: 5
     restart: unless-stopped
 
-  job-service:
-    build: ./job_service
+  backend:
+    build: ./backend
     environment:
       DB_HOST: cockroachdb
       RABBITMQ_HOST: rabbitmq
+      APP_JWT_SECRET: ${APP_JWT_SECRET}
     ports:
       - "7000:7000"
     depends_on:
       cockroachdb:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
-  
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
   scheduler:
     build: ./scheduler
     environment:
@@ -40,7 +54,7 @@ services:
       RABBITMQ_HOST: rabbitmq
     depends_on:
       cockroachdb:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
   
@@ -51,7 +65,7 @@ services:
       RABBITMQ_HOST: rabbitmq
     depends_on:
       cockroachdb:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     deploy:
