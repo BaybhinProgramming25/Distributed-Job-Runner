@@ -1,4 +1,4 @@
-package com.example.connection;
+package com.example.component;
 
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;

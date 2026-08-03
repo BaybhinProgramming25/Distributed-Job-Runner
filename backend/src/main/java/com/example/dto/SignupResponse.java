@@ -1,7 +1,7 @@
 package com.example.dto;
 
 public record SignupResponse(
-    Long userId,
+    Long id,
     String username,
-    String token
+    String email
 ) {}
