@@ -55,4 +55,4 @@ A distributed job-feed aggregator that polls **11 applicant-tracking systems** (
 
 ## Visit
 
-You can signup at [CS-Job-Runner](https://csjobrunner.org) and see the various postings!
+You can signup at [CSJobRunner](https://csjobrunner.org) and see the various postings!
