@@ -3,12 +3,12 @@ package com.example.processing;
 import org.springframework.stereotype.Component;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+// import java.util.HashMap;
 import java.util.List;
 
 import com.example.model.JobBatch;
@@ -18,12 +18,14 @@ import com.example.model.JobFound;
 public class JobProcessing {
 
     private static final Logger log = LoggerFactory.getLogger(JobProcessing.class);
-    private static final int SMS_MAX_JOBS_PER_ALERT = 25;
+    // private static final int SMS_MAX_JOBS_PER_ALERT = 25;
 
     private final JdbcTemplate jdbcTemplate;
+    private final RabbitTemplate jsonRabbitTemplate;
 
-    public JobProcessing(JdbcTemplate jdbctemplate) {
+    public JobProcessing(JdbcTemplate jdbctemplate, RabbitTemplate jsonRabbitTemplate) {
         this.jdbcTemplate = jdbctemplate;
+        this.jsonRabbitTemplate = jsonRabbitTemplate;
     }
 
     @RabbitListener(queues = "job.queue")
@@ -41,9 +43,14 @@ public class JobProcessing {
             log.info("No new jobs found this cycle...");
         } else {
             log.info("{} new job(s)", freshJobs.size());
-            notifyBatch(freshJobs);
-        }
 
+            for (JobFound job : freshJobs) {
+                jsonRabbitTemplate.convertAndSend("new-jobs", job);
+            }
+
+            // Leave this unmarked for now 
+            // notifyBatch(freshJobs);
+        }
     }
 
     private List<JobFound> insertAll(List<JobFound> newJobs) {
@@ -60,13 +67,14 @@ public class JobProcessing {
                     INSERT INTO dist_jobs_scheduler.found_jobs
                     (company, ats, jobId, title, location, department, url, posted, firstSeen, lastSeen)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())
-                    ON CONFLICT (job_id) DO UPDATE SET lastSeen = now()""", j.company(), j.ats(), j.jobId(), j.title(), j.location(), j.department(), j.url(), j.posted());
+                    ON CONFLICT (jobId) DO UPDATE SET lastSeen = now()""", j.company(), j.ats(), j.jobId(), j.title(), j.location(), j.department(), j.url(), j.posted());
                 freshJobs.add(j);
             }
         }
         return freshJobs;
     }
 
+    /* 
     private void notifyBatch(List<JobFound> newJobs) {
 
         if (newJobs.isEmpty()) {
@@ -111,4 +119,5 @@ public class JobProcessing {
             // Do more stuff later...
         }
     }
+    */
 }
