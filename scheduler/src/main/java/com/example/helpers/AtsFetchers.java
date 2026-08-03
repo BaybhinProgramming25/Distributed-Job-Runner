@@ -195,8 +195,17 @@ public class AtsFetchers {
  
     private List<JobFound> teamtailor(String slug) throws Exception {
         JsonNode data = getJson("https://" + slug + ".teamtailor.com/jobs.json");
-        JsonNode items = data.isArray() ? data : data.path("jobs");
         List<JobFound> out = new ArrayList<>();
+        // Current career sites serve JSON Feed: postings live in "items"
+        // with only id/title/url/date_published (no location or department)
+        if (data.has("items")) {
+            for (JsonNode j : data.path("items")) {
+                out.add(JobFound.of(slug, "teamtailor", text(j, "id"), text(j, "title"),
+                        "", "", text(j, "url"), text(j, "date_published")));
+            }
+            return out;
+        }
+        JsonNode items = data.isArray() ? data : data.path("jobs");
         for (JsonNode j : items) {
             String url = !text(j, "url").isEmpty()
                     ? text(j, "url") : text(j, "careersite_job_url");

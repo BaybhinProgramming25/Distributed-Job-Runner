@@ -1,5 +1,6 @@
 package com.example.poller;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -30,11 +31,13 @@ public class JobPoller implements CommandLineRunner {
     private final PollingTargets targets;
     private final AtsFetchers fetchers;
     private final RabbitTemplate rabbitTemplate;
+    private final long pollIntervalMs;
 
-    public JobPoller(PollingTargets targets, AtsFetchers fetchers, RabbitTemplate rabbitTemplate) {
+    public JobPoller(PollingTargets targets, AtsFetchers fetchers, RabbitTemplate rabbitTemplate, @Value("${poll.minutes:30}") long pollMinutes) {
         this.targets = targets;
         this.fetchers = fetchers;
         this.rabbitTemplate = rabbitTemplate;
+        this.pollIntervalMs = pollMinutes * 60_000;
     }
 
     @Override
@@ -83,9 +86,9 @@ public class JobPoller implements CommandLineRunner {
                 log.error("Failed to publish batch to RabbitMQ", e);
             }
 
-            // 5 minutes sleep (shortened from 30 for testing)
+            // Sleep between cycles: POLL_MINUTES env var, defaults to 30
             try {
-                Thread.sleep(5*60*1000);
+                Thread.sleep(pollIntervalMs);
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
                 log.info("Scheduler is down...");
@@ -94,17 +97,22 @@ public class JobPoller implements CommandLineRunner {
         }
     }
 
-    /** Reject postings older than MAX_POSTED_AGE; unparseable/missing dates are rejected too. */
     private static boolean isFresh(JobFound j) {
         Instant posted = parsePosted(j.posted());
         return posted != null && posted.isAfter(Instant.now().minus(MAX_POSTED_AGE));
     }
 
-    // `posted` formats vary by ATS: ISO timestamps (greenhouse/ashby/workable),
-    // epoch millis or seconds (lever), bare dates, or empty.
+
     private static Instant parsePosted(String posted) {
         if (posted == null || posted.isBlank()) return null;
         String p = posted.strip();
+
+        String lower = p.toLowerCase();
+        if (lower.contains("today")) return Instant.now();
+        if (lower.contains("yesterday")) return Instant.now().minus(Duration.ofDays(1));
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+)\\+? days? ago").matcher(lower);
+        if (m.find()) return Instant.now().minus(Duration.ofDays(Long.parseLong(m.group(1))));
+
         try {
             if (p.matches("\\d{13}")) return Instant.ofEpochMilli(Long.parseLong(p));
             if (p.matches("\\d{10}")) return Instant.ofEpochSecond(Long.parseLong(p));
