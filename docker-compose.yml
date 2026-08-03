@@ -63,7 +63,7 @@ services:
       DB_HOST: cockroachdb
       RABBITMQ_HOST: rabbitmq
       APP_JWT_SECRET: ${APP_JWT_SECRET}
-      APP_ALLOWED_ORIGIN: ${APP_ALLOWED_ORIGIN:-http://localhost}
+      APP_ALLOWED_ORIGIN: ${APP_ALLOWED_ORIGIN}
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75.0
     depends_on:
       cockroachdb:
