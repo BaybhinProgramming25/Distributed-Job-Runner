@@ -11,10 +11,10 @@ CREATE TABLE IF NOT EXISTS dist_jobs_scheduler.users(
 );
 
 CREATE TABLE IF NOT EXISTS dist_jobs_scheduler.found_jobs(
-    id BIGINT GENERATED ALWAYS AS PRIMARY KEY,
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     company VARCHAR(255),
     ats VARCHAR(32),
-    jobId VARCHAR(255),
+    jobId VARCHAR(255) UNIQUE,
     title TEXT,
     location TEXT,
     department TEXT,
