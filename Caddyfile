@@ -12,3 +12,7 @@
 		reverse_proxy frontend:80
 	}
 }
+
+{$WWW_ADDRESS:http://www.localhost} {
+	redir https://{$SITE_ADDRESS}{uri} permanent
+}

@@ -7,6 +7,7 @@ services:
       - "443:443"
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS}
+      WWW_ADDRESS: ${WWW_ADDRESS:-http://www.localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
@@ -118,7 +119,7 @@ services:
       rabbitmq:
         condition: service_healthy
     deploy:
-      replicas: 3 # 3 Replicas in Production
+      replicas: 3
       resources:
         limits:
           memory: 400m

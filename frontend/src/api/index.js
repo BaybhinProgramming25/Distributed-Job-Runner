@@ -15,7 +15,9 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     const status = err.response?.status;
-    if ((status === 401 || status === 403) && window.location.pathname !== '/login') {
+    const url = err.config?.url || '';
+    const isAuthCall = url.includes('/api/users/signup') || url.includes('/api/users/login');
+    if ((status === 401 || status === 403) && !isAuthCall && window.location.pathname !== '/login') {
       clearAuth();
       window.location.href = '/login';
     }

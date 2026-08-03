@@ -31,6 +31,7 @@ jobs:
             script: |
               cat > ~/Distributed-Job-Runner/.env << 'EOF'
               SITE_ADDRESS=${{ secrets.SITE_ADDRESS }}
+              WWW_ADDRESS=www.${{ secrets.SITE_ADDRESS }}
               APP_ALLOWED_ORIGIN=https://${{ secrets.SITE_ADDRESS }}
               APP_JWT_SECRET=${{ secrets.APP_JWT_SECRET }}
               EOF

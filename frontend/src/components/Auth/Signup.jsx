@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import api from '../../api';
+import { saveAuth } from '../../auth';
 import './Auth.css';
 
 const Signup = () => {
@@ -19,8 +20,9 @@ const Signup = () => {
     setLoading(true);
 
     try {
-      await api.post('/api/users/signup', { username, email, password, phoneNumber });
-      navigate('/login');
+      const res = await api.post('/api/users/signup', { username, email, password, phoneNumber });
+      saveAuth(res.data.token, res.data.username);
+      navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Signup failed — that username or email may already be taken');
     } finally {

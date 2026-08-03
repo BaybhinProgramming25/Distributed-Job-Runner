@@ -43,7 +43,8 @@ public class UserService {
         String hash = passwordEncoder.encode(request.password());
         User saved = userRepository.save(request.username(), request.email(), hash, request.phoneNumber());
 
-        return new SignupResponse(saved.id(), saved.username(), saved.email());
+        String token = jwtService.generateToken(saved.username());
+        return new SignupResponse(saved.id(), saved.username(), saved.email(), token);
     }
 
     public LoginResponse login(LoginRequest request) {
