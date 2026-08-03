@@ -11,12 +11,20 @@ const subsKey = (username) => `subscriptions:${username}`;
 
 const jobKey = (job) => job.url || `${job.company}|${job.title}`;
 
-// `posted` comes straight from each ATS and the format varies:
-// ISO strings (greenhouse/ashby), epoch millis/seconds (lever), free text, or empty.
+// `posted` comes straight from each ATS and the format varies: ISO strings
+// (greenhouse/ashby), epoch millis/seconds (lever), relative text like
+// "Posted Today" / "Posted 2 Days Ago" (workday), or empty.
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const parsePostedMs = (posted) => {
   if (!posted) return NaN;
   if (/^\d{13,}$/.test(posted)) return Number(posted);
   if (/^\d{10}$/.test(posted)) return Number(posted) * 1000;
+  const lower = posted.toLowerCase();
+  if (lower.includes('today')) return Date.now();
+  if (lower.includes('yesterday')) return Date.now() - DAY_MS;
+  const rel = lower.match(/(\d+)\+? days? ago/);
+  if (rel) return Date.now() - Number(rel[1]) * DAY_MS;
   return Date.parse(posted);
 };
 
@@ -27,6 +35,62 @@ const formatPosted = (posted) => {
   return new Date(ms).toLocaleDateString(undefined, {
     year: 'numeric', month: 'short', day: 'numeric',
   });
+};
+
+// Seniority is inferred from the job title, checked most-specific first so
+// "Senior Software Engineer II" lands on Senior, not II.
+const LEVEL_ORDER = [
+  'Intern', 'Entry / Junior', 'I', 'II', 'III',
+  'Senior', 'Staff', 'Principal', 'Lead / Manager', 'Other',
+];
+
+const levelOf = (title) => {
+  const t = (title || '').toLowerCase();
+  if (/\bintern(ship)?\b/.test(t)) return 'Intern';
+  if (/\bprincipal\b/.test(t)) return 'Principal';
+  if (/\bstaff\b/.test(t)) return 'Staff';
+  if (/\b(lead|manager|head|director|vp)\b/.test(t)) return 'Lead / Manager';
+  if (/\b(senior|sr)\b/.test(t)) return 'Senior';
+  if (/\b(iii|3)\b/.test(t)) return 'III';
+  if (/\b(ii|2)\b/.test(t)) return 'II';
+  if (/\b(i|1)\b/.test(t)) return 'I';
+  if (/\b(junior|jr|entry|graduate|new grad|early career)\b/.test(t)) return 'Entry / Junior';
+  return 'Other';
+};
+
+const US_STATES = new Set([
+  'al','ak','az','ar','ca','co','ct','de','fl','ga','hi','id','il','in','ia',
+  'ks','ky','la','me','md','ma','mi','mn','ms','mo','mt','ne','nv','nh','nj',
+  'nm','ny','nc','nd','oh','ok','or','pa','ri','sc','sd','tn','tx','ut','vt',
+  'va','wa','wv','wi','wy','dc',
+]);
+
+const COUNTRY_ALIASES = {
+  'us': 'United States', 'usa': 'United States', 'u.s.': 'United States',
+  'usa only': 'United States', 'united states': 'United States',
+  'united states of america': 'United States',
+  'uk': 'United Kingdom', 'united kingdom': 'United Kingdom', 'england': 'United Kingdom',
+  'deutschland': 'Germany', 'the netherlands': 'Netherlands', 'holland': 'Netherlands',
+};
+
+const titleCase = (s) => s.replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1));
+
+// Location strings are free text and vary wildly by ATS ("San Francisco, CA",
+// "Berlin, Germany", "Remote", "USA Only", "2 Locations"). Best effort: scan
+// comma/slash segments right-to-left for a known country or US state, fall
+// back to Remote, then to the last segment as-is.
+const countryOf = (location) => {
+  const loc = (location || '').trim();
+  if (!loc) return 'Unspecified';
+  const segs = loc.split(/[,/|]| - /).map((s) => s.trim().toLowerCase()).filter(Boolean);
+  for (let i = segs.length - 1; i >= 0; i--) {
+    if (COUNTRY_ALIASES[segs[i]]) return COUNTRY_ALIASES[segs[i]];
+    if (US_STATES.has(segs[i])) return 'United States';
+  }
+  if (!segs.length) return 'Unspecified';
+  const last = segs[segs.length - 1];
+  if (/remote|worldwide|anywhere|global/.test(last)) return 'Remote';
+  return titleCase(last);
 };
 
 const sortKeys = {
@@ -62,7 +126,9 @@ const Dashboard = () => {
   const [jobs, setJobs] = useState([]);
   const [connected, setConnected] = useState(false);
   const [subs, setSubs] = useState(() => loadSavedSubs(username));
-  const [filterAts, setFilterAts] = useState(null); // null = show all
+  const [filterAts, setFilterAts] = useState(null);         // null = show all
+  const [filterLevel, setFilterLevel] = useState('');        // '' = all levels
+  const [filterCountry, setFilterCountry] = useState('');    // '' = all locations
   const [sortBy, setSortBy] = useState('found');    // 'found' | 'posted', newest first
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState(null);
@@ -108,11 +174,27 @@ const Dashboard = () => {
     [atsList]
   );
 
+  // Dropdown options come from the jobs actually on the dashboard,
+  // so you never pick a filter that matches nothing.
+  const levelOptions = useMemo(() => {
+    const present = new Set(jobs.map((j) => levelOf(j.title)));
+    return LEVEL_ORDER.filter((l) => present.has(l));
+  }, [jobs]);
+
+  const countryOptions = useMemo(
+    () => [...new Set(jobs.map((j) => countryOf(j.location)))].sort(),
+    [jobs]
+  );
+
   const visibleJobs = useMemo(() => {
-    const filtered = filterAts ? jobs.filter((j) => j.ats === filterAts) : jobs;
+    const filtered = jobs.filter((j) =>
+      (!filterAts || j.ats === filterAts) &&
+      (!filterLevel || levelOf(j.title) === filterLevel) &&
+      (!filterCountry || countryOf(j.location) === filterCountry)
+    );
     const key = sortKeys[sortBy];
     return [...filtered].sort((a, b) => key(b) - key(a));
-  }, [jobs, filterAts, sortBy]);
+  }, [jobs, filterAts, filterLevel, filterCountry, sortBy]);
 
   const toggleAts = (name, checked) => {
     setSaveMsg(null);
@@ -216,6 +298,32 @@ const Dashboard = () => {
             </div>
           )}
           <div className='feed-sort'>
+            <label className='feed-select-wrap'>
+              <span className='feed-sort-label'>Level</span>
+              <select
+                className='feed-select'
+                value={filterLevel}
+                onChange={(e) => setFilterLevel(e.target.value)}
+              >
+                <option value=''>All</option>
+                {levelOptions.map((l) => (
+                  <option key={l} value={l}>{l}</option>
+                ))}
+              </select>
+            </label>
+            <label className='feed-select-wrap'>
+              <span className='feed-sort-label'>Location</span>
+              <select
+                className='feed-select'
+                value={filterCountry}
+                onChange={(e) => setFilterCountry(e.target.value)}
+              >
+                <option value=''>All</option>
+                {countryOptions.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </label>
             <span className='feed-sort-label'>Sort by</span>
             <button
               className={sortBy === 'found' ? 'filter-chip filter-chip--active' : 'filter-chip'}

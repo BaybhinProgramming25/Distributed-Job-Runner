@@ -321,6 +321,30 @@
   letter-spacing: 0.05em;
 }
 
+.feed-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.feed-select {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 5px 10px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.feed-select:hover,
+.feed-select:focus {
+  border-color: var(--border-focus);
+}
+
 .filter-chip {
   padding: 5px 14px;
   background-color: var(--bg-input);
