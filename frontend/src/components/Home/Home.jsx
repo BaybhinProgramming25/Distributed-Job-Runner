@@ -5,7 +5,7 @@ const Home = () => {
   return (
     <div className="home-page">
       <section className="home-hero">
-        <h1 className="home-hero-title">Job Runner</h1>
+        <h1 className="home-hero-title">SWE Job Feed</h1>
         <p className="home-hero-sub">
           A distributed job-posting watcher. Subscribe to the companies you care about
           and see new openings land on your dashboard the moment our workers find them.

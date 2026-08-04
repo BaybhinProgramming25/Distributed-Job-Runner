@@ -228,8 +228,8 @@ const Dashboard = () => {
       <aside className='dashboard-sidebar'>
         <div className='dashboard-sidebar-top'>
           <Link to='/' className='sidebar-logo'>
-            <span className='sidebar-logo-icon'>JR</span>
-            <span className='sidebar-logo-text'>Job Runner</span>
+            <span className='sidebar-logo-icon'>SWE</span>
+            <span className='sidebar-logo-text'>SWE Job Feed</span>
           </Link>
 
           <div className='company-panel'>
