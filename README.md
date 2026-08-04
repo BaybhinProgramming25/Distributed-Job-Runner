@@ -1,4 +1,4 @@
-# CS Job Runner
+# SWE Job Feed
 
 A distributed job-feed aggregator that polls **11 applicant-tracking systems** (Greenhouse, Ashby, Lever, SmartRecruiters, Recruitee, Workable, Teamtailor, Workday, Remotive, RemoteOK, Arbeitnow) for fresh software-engineering openings and publishes them on a dashboard.
 
