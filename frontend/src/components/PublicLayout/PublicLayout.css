@@ -33,7 +33,7 @@
   width: 32px;
   height: 32px;
   background-color: var(--accent);
-  color: #fff;
+  color: var(--accent-text);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
@@ -70,7 +70,7 @@
 .public-nav-signup {
   padding: 7px 16px;
   background-color: var(--accent);
-  color: #fff !important;
+  color: var(--accent-text) !important;
   border-radius: var(--radius-full);
   font-weight: 500;
   transition: background-color 0.15s !important;

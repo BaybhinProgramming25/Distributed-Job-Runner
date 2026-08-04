@@ -51,12 +51,12 @@
 
 .home-cta--primary {
   background-color: var(--accent);
-  color: #fff;
+  color: var(--accent-text);
 }
 
 .home-cta--primary:hover {
   background-color: var(--accent-hover);
-  color: #fff;
+  color: var(--accent-text);
   text-decoration: none;
 }
 

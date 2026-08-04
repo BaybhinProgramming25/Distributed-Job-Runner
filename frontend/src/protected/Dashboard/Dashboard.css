@@ -37,7 +37,7 @@
   width: 32px;
   height: 32px;
   background-color: var(--accent);
-  color: #fff;
+  color: var(--accent-text);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
@@ -163,7 +163,7 @@
 .company-save {
   padding: 10px;
   background-color: var(--accent);
-  color: #fff;
+  color: var(--accent-text);
   border: none;
   border-radius: var(--radius-sm);
   font-size: 14px;
@@ -200,7 +200,7 @@
   width: 32px;
   height: 32px;
   background-color: var(--accent);
-  color: #fff;
+  color: var(--accent-text);
   border-radius: var(--radius-full);
   display: flex;
   align-items: center;
@@ -279,7 +279,7 @@
 
 .feed-status--live {
   color: var(--success);
-  border-color: rgba(34, 197, 94, 0.4);
+  border-color: rgba(52, 211, 153, 0.4);
 }
 
 .feed-status--live .feed-status-dot {
